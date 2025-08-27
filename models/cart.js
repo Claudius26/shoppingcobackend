@@ -1,10 +1,16 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/db');
-
+const { DataTypes } = require('sequelize')
+const { sequelize } = require('../config/db')
+const User = require('./user')
 
 const Cart = sequelize.define('Cart', {
-userId: { type: DataTypes.INTEGER, allowNull: false }
-});
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  }
+})
 
+User.hasOne(Cart, { foreignKey: 'userId', onDelete: 'CASCADE' })
+Cart.belongsTo(User, { foreignKey: 'userId' })
 
-module.exports = Cart;
+module.exports = Cart
