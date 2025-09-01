@@ -1,14 +1,44 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
-
+const User = require('./user');
+const Product = require('./product');
 
 const Order = sequelize.define('Order', {
-userId: { type: DataTypes.INTEGER, allowNull: false },
-totalAmount: { type: DataTypes.DECIMAL(10,2), allowNull: false, defaultValue: 0 },
-status: { type: DataTypes.ENUM('pending','processing','shipped','completed','cancelled'), defaultValue: 'pending' },
-paymentMethod: { type: DataTypes.ENUM('card','paypal','bank','crypto'), allowNull: false },
-paymentStatus: { type: DataTypes.ENUM('unpaid','paid','failed','refunded'), defaultValue: 'unpaid' }
+  id: {
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
+    primaryKey: true
+  },
+  quantity: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  totalPrice: {
+    type: DataTypes.FLOAT,
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.ENUM('pending', 'paid', 'shipped', 'delivered', 'cancelled'),
+    defaultValue: 'pending'
+  },
+  buyerId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  },
+  productId: {
+    type: DataTypes.INTEGER,
+    allowNull: false
+  }
+}, {
+  tableName: 'orders',
+  timestamps: true,
 });
 
+
+Order.belongsTo(User, { foreignKey: 'buyerId', as: 'buyer' });
+User.hasMany(Order, { foreignKey: 'buyerId', as: 'orders' });
+
+Order.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+Product.hasMany(Order, { foreignKey: 'productId', as: 'orders' });
 
 module.exports = Order;

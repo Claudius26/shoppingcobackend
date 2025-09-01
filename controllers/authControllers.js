@@ -5,27 +5,15 @@ require('dotenv').config();
 
 const register = async (req, res) => {
   try {
-    const {
-      firstname,
-      lastname,
-      dob,
-      nationality,
-      residence,
-      phone,
-      email,
-      password
-    } = req.body;
+    const { firstname, lastname, dob, nationality, residence, phone, email, password, role } = req.body;
 
-    
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ message: 'Email already in use' });
+      return res.status(400).json({ message: 'User already exists' });
     }
 
-  
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    
     const newUser = await User.create({
       firstname,
       lastname,
@@ -35,35 +23,25 @@ const register = async (req, res) => {
       phone,
       email,
       password: hashedPassword,
+      role: role || 'buyer', // default is buyer
     });
 
-    // Generate JWT
-    const token = jwt.sign(
-      { id: newUser.id, isAdmin: newUser.isAdmin },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = jwt.sign({ id: newUser.id, role: newUser.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    return res.status(201).json({
-      message: 'User registered successfully',
+    res.status(201).json({
+      token,
       user: {
         id: newUser.id,
         firstname: newUser.firstname,
         lastname: newUser.lastname,
         email: newUser.email,
-        isAdmin: newUser.isAdmin,
-      },
-      token
+        role: newUser.role,
+      }
     });
-
   } catch (error) {
-    return res.status(500).json({
-      message: 'Registration failed',
-      error: error.message || 'Unknown error'
-    });
+    res.status(500).json({ message: 'Registration failed', error: error.message });
   }
 };
-
 
 const login = async (req, res) => {
   try {
@@ -108,7 +86,7 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: ['id', 'name', 'email', 'isAdmin', 'createdAt'],
+      attributes: ['id', 'firstname', 'lastname', 'email', 'isAdmin', 'createdAt'],
     });
 
     if (!user) {
@@ -120,6 +98,7 @@ const getProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
   }
 };
+
 
 module.exports = {
   register,

@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
+const User = require('./user');
 
 const Product = sequelize.define('Product', {
   id: {
@@ -22,10 +23,20 @@ const Product = sequelize.define('Product', {
     type: DataTypes.INTEGER,
     defaultValue: 0,
   },
+  imageUrl: {
+    type: DataTypes.STRING, // store image path or URL
+  },
+  available: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+  }
 }, {
   tableName: 'products',
   timestamps: true,
 });
 
-module.exports = Product;
+// Relationship: Seller owns product
+User.hasMany(Product, { foreignKey: 'sellerId', onDelete: 'CASCADE' });
+Product.belongsTo(User, { foreignKey: 'sellerId' });
 
+module.exports = Product;

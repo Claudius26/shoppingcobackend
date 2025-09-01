@@ -13,4 +13,4 @@ const Cart = sequelize.define('Cart', {
 User.hasOne(Cart, { foreignKey: 'userId', onDelete: 'CASCADE' })
 Cart.belongsTo(User, { foreignKey: 'userId' })
 
-module.exports = Cart
+module.exports = Cart;
