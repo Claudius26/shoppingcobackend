@@ -5,13 +5,15 @@ const {
   getProducts,
   updateProduct,
   deleteProduct,
+  getSellerProducts
 } = require('../controllers/productControllers');
-
 const { protect } = require('../middlewares/authMiddleware');
+const upload = require('../middlewares/uploadMiddleware');
 
-router.post('/', protect, createProduct); // seller only
-router.get('/', getProducts); 
-router.put('/:id', protect, updateProduct); // seller only
-router.delete('/:id', protect, deleteProduct); // seller only
+router.post('/seller', protect, upload.single('image'), createProduct);
+router.get('/seller', protect, getSellerProducts);
+router.put('/seller/:id', protect, upload.single('image'), updateProduct);
+router.delete('/seller/:id', protect, deleteProduct);
+router.get('/', getProducts);
 
 module.exports = router;

@@ -2,34 +2,18 @@ const { Order, OrderItem, Product, Payment } = require('../models');
 
 const checkout = async (req, res) => {
   try {
-    if (req.user.role !== 'buyer') {
-      return res.status(403).json({ message: 'Only buyers can checkout' });
-    }
-
-    const { paymentMethod, currency, items } = req.body;
-
+    const { paymentMethod, currency } = req.body;
     if (!paymentMethod) return res.status(400).json({ message: 'Payment method required' });
-    if (!items || items.length === 0) return res.status(400).json({ message: 'No items provided' });
 
-    // validate and calculate total
-    let totalAmount = 0;
-    const orderItems = [];
-
-    for (const item of items) {
-      const product = await Product.findByPk(item.productId);
-      if (!product) {
-        return res.status(404).json({ message: `Product with id ${item.productId} not found` });
-      }
-
-      if (!product.isAvailable || product.quantity < item.quantity) {
-        return res.status(400).json({ message: `Not enough stock for ${product.name}` });
-      }
-
-      totalAmount += product.price * item.quantity;
-      orderItems.push({ product, quantity: item.quantity, price: product.price });
+    const cart = await req.user.getCart({ include: { model: Product } });
+    if (!cart || cart.Products.length === 0) {
+      return res.status(400).json({ message: 'Cart is empty' });
     }
 
-    // create order
+    const totalAmount = cart.Products.reduce((sum, product) => {
+      return sum + product.CartItem.quantity * product.price;
+    }, 0);
+
     const order = await Order.create({
       userId: req.user.id,
       status: 'pending',
@@ -37,23 +21,18 @@ const checkout = async (req, res) => {
       currency
     });
 
-    // create order items + reduce stock
-    for (const item of orderItems) {
-      await OrderItem.create({
-        orderId: order.id,
-        productId: item.product.id,
-        quantity: item.quantity,
-        price: item.price
-      });
+    await Promise.all(
+      cart.Products.map(product =>
+        OrderItem.create({
+          orderId: order.id,
+          productId: product.id,
+          quantity: product.CartItem.quantity,
+          unitPrice: product.price,
+          subtotal: product.CartItem.quantity * product.price
+        })
+      )
+    );
 
-      item.product.quantity -= item.quantity;
-      if (item.product.quantity <= 0) {
-        item.product.isAvailable = false;
-      }
-      await item.product.save();
-    }
-
-    // create payment
     const payment = await Payment.create({
       orderId: order.id,
       method: paymentMethod,
@@ -61,6 +40,8 @@ const checkout = async (req, res) => {
       amount: totalAmount,
       currency
     });
+
+    await cart.setProducts([]);
 
     res.status(201).json({ order, payment });
   } catch (error) {
@@ -85,13 +66,10 @@ const getOrderById = async (req, res) => {
     const order = await Order.findByPk(req.params.id, {
       include: [{ model: OrderItem, include: [Product] }, Payment]
     });
-
     if (!order) return res.status(404).json({ message: 'Order not found' });
-
     if (order.userId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Unauthorized' });
     }
-
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch order', error: error.message });
@@ -100,10 +78,6 @@ const getOrderById = async (req, res) => {
 
 const getAllOrders = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can view all orders' });
-    }
-
     const orders = await Order.findAll({
       include: [{ model: OrderItem, include: [Product] }, Payment]
     });
@@ -115,15 +89,9 @@ const getAllOrders = async (req, res) => {
 
 const updateOrderStatus = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can update order status' });
-    }
-
     const { status } = req.body;
     const order = await Order.findByPk(req.params.id);
-
     if (!order) return res.status(404).json({ message: 'Order not found' });
-
     await order.update({ status });
     res.json(order);
   } catch (error) {
@@ -133,13 +101,8 @@ const updateOrderStatus = async (req, res) => {
 
 const deleteOrder = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only admins can delete orders' });
-    }
-
     const order = await Order.findByPk(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-
     await order.destroy();
     res.json({ message: 'Order deleted successfully' });
   } catch (error) {
@@ -149,11 +112,17 @@ const deleteOrder = async (req, res) => {
 
 const confirmPayment = async (req, res) => {
   try {
-    const order = await Order.findByPk(req.params.id, { include: Payment });
+    const order = await Order.findByPk(req.params.id, { 
+      include: [
+        { model: OrderItem, include: [Product] }, 
+        Payment
+      ] 
+    });
+
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
     const { status } = req.body;
-    if (!['success', 'failed'].includes(status)) {
+    if (!['succeeded', 'failed'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
 
@@ -163,8 +132,23 @@ const confirmPayment = async (req, res) => {
 
     await order.Payment.update({ status });
 
-    if (status === 'success') {
+    if (status === 'succeeded') {
+      // update order status
       await order.update({ status: 'paid' });
+
+      // reduce stock
+      for (const item of order.OrderItems) {
+        if (item.Product) {
+          const newStock = item.Product.stock - item.quantity;
+          if (newStock < 0) {
+            return res.status(400).json({ 
+              message: `Insufficient stock for product ${item.Product.name}` 
+            });
+          }
+          await item.Product.update({ stock: newStock });
+        }
+      }
+
     } else {
       await order.update({ status: 'failed' });
     }
@@ -174,6 +158,7 @@ const confirmPayment = async (req, res) => {
     res.status(500).json({ message: 'Failed to confirm payment', error: error.message });
   }
 };
+
 
 module.exports = {
   checkout,
