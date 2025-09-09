@@ -5,7 +5,7 @@ const CartItem = require("./CartItem");
 const Order = require("./Order");
 const OrderItem = require("./OrderItem");
 const Payment = require("./Payment");
-const Activity = require("./activity");
+const Activity = require("./Activity");
 
 // Associations
 User.hasOne(Cart, { foreignKey: "userId", onDelete: "CASCADE" });
