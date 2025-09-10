@@ -5,7 +5,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 const createProduct = async (req, res) => {
   try {
-    let imageUrl = null
+    let imageUrl = req.body.imageUrl || null
+
     if (req.file) {
       const { originalname, buffer } = req.file
       const filePath = `products/${Date.now()}-${originalname}`
@@ -14,6 +15,7 @@ const createProduct = async (req, res) => {
       const { data } = supabase.storage.from('products').getPublicUrl(filePath)
       imageUrl = data.publicUrl
     }
+
     const product = await Product.create({ ...req.body, image: imageUrl, userId: req.user.id })
     res.status(201).json(product)
   } catch (err) {
@@ -43,7 +45,9 @@ const updateProduct = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
-    let imageUrl = product.image
+
+    let imageUrl = req.body.imageUrl || product.image
+
     if (req.file) {
       const { originalname, buffer } = req.file
       const filePath = `products/${Date.now()}-${originalname}`
@@ -52,6 +56,7 @@ const updateProduct = async (req, res) => {
       const { data } = supabase.storage.from('products').getPublicUrl(filePath)
       imageUrl = data.publicUrl
     }
+
     await product.update({ ...req.body, image: imageUrl })
     res.json(product)
   } catch (err) {

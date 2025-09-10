@@ -24,7 +24,7 @@ const Product = sequelize.define('Product', {
     defaultValue: 0,
   },
   imageUrl: {
-    type: DataTypes.STRING, // store image path or URL
+    type: DataTypes.STRING, 
   },
   available: {
     type: DataTypes.BOOLEAN,
@@ -35,7 +35,7 @@ const Product = sequelize.define('Product', {
   timestamps: true,
 });
 
-// Relationship: Seller owns product
+ 
 User.hasMany(Product, { foreignKey: 'sellerId', onDelete: 'CASCADE' });
 Product.belongsTo(User, { foreignKey: 'sellerId' });
 
