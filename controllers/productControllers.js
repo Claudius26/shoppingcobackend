@@ -1,132 +1,73 @@
-const { Product, Activity } = require('../models');
+const { Product } = require('../models')
+const { createClient } = require('@supabase/supabase-js')
 
-const getFullImageUrl = (req, imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith('http')) return imagePath;
-  return `${req.protocol}://${req.get('host')}${imagePath}`;
-};
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
 
 const createProduct = async (req, res) => {
   try {
-    const { title, description, price, quantity, imageUrl } = req.body;
-    if (req.user.role !== 'seller') return res.status(403).json({ message: 'Only sellers can add products' });
-
-    const finalImageUrl = req.file ? `/uploads/${req.file.filename}` : imageUrl || null;
-
-    const product = await Product.create({
-      title,
-      description,
-      price,
-      quantity,
-      imageUrl: finalImageUrl,
-      sellerId: req.user.id,
-      available: quantity > 0
-    });
-
-    await Activity.create({
-      userId: req.user.id,
-      type: 'Product',
-      action: 'Added',
-      detail: `Added product: ${product.title}`,
-    });
-
-    product.imageUrl = getFullImageUrl(req, product.imageUrl);
-    res.status(201).json(product);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to create product', error: error.message });
+    let imageUrl = null
+    if (req.file) {
+      const { originalname, buffer } = req.file
+      const filePath = `products/${Date.now()}-${originalname}`
+      const { error } = await supabase.storage.from('products').upload(filePath, buffer, { contentType: req.file.mimetype })
+      if (error) return res.status(400).json({ message: 'Image upload failed', error })
+      const { data } = supabase.storage.from('products').getPublicUrl(filePath)
+      imageUrl = data.publicUrl
+    }
+    const product = await Product.create({ ...req.body, image: imageUrl, userId: req.user.id })
+    res.status(201).json(product)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
   }
-};
-
-const updateProduct = async (req, res) => {
-  try {
-    const { title, description, price, quantity, imageUrl, available } = req.body;
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    if (product.sellerId !== req.user.id) return res.status(403).json({ message: 'Not authorized to update this product' });
-
-    const finalImageUrl = req.file ? `/uploads/${req.file.filename}` : imageUrl || product.imageUrl;
-
-    await product.update({
-      title,
-      description,
-      price,
-      quantity,
-      imageUrl: finalImageUrl,
-      available: quantity > 0 ? true : available
-    });
-
-    await Activity.create({
-      userId: req.user.id,
-      type: 'Product',
-      action: 'Updated',
-      detail: `Updated product: ${product.title}`,
-    });
-
-    product.imageUrl = getFullImageUrl(req, product.imageUrl);
-    res.json(product);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to update product', error: error.message });
-  }
-};
-
-const deleteProduct = async (req, res) => {
-  try {
-    const product = await Product.findByPk(req.params.id);
-    if (!product) return res.status(404).json({ message: 'Product not found' });
-    if (product.sellerId !== req.user.id) return res.status(403).json({ message: 'Not authorized to delete this product' });
-
-    await product.destroy();
-
-    await Activity.create({
-      userId: req.user.id,
-      type: 'Product',
-      action: 'Deleted',
-      detail: `Deleted product: ${product.title}`,
-    });
-
-    res.json({ message: 'Product deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to delete product', error: error.message });
-  }
-};
+}
 
 const getProducts = async (req, res) => {
   try {
-    const products = await Product.findAll({ where: { available: true } });
-    const updatedProducts = products.map(p => ({
-      ...p.toJSON(),
-      imageUrl: getFullImageUrl(req, p.imageUrl)
-    }));
-    res.json(updatedProducts);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch products', error: error.message });
+    const products = await Product.findAll()
+    res.json(products)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
   }
-};
+}
 
 const getSellerProducts = async (req, res) => {
   try {
-    if (req.user.role !== 'seller') return res.status(403).json({ message: 'Only sellers can view their products' });
-
-    const products = await Product.findAll({
-      where: { sellerId: req.user.id },
-      order: [['createdAt', 'DESC']]
-    });
-
-    const updatedProducts = products.map(p => ({
-      ...p.toJSON(),
-      imageUrl: getFullImageUrl(req, p.imageUrl)
-    }));
-
-    res.json(updatedProducts);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch seller products', error: error.message });
+    const products = await Product.findAll({ where: { userId: req.user.id } })
+    res.json(products)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
   }
-};
+}
 
-module.exports = {
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  getProducts,
-  getSellerProducts
-};
+const updateProduct = async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id)
+    if (!product) return res.status(404).json({ message: 'Product not found' })
+    let imageUrl = product.image
+    if (req.file) {
+      const { originalname, buffer } = req.file
+      const filePath = `products/${Date.now()}-${originalname}`
+      const { error } = await supabase.storage.from('products').upload(filePath, buffer, { contentType: req.file.mimetype })
+      if (error) return res.status(400).json({ message: 'Image upload failed', error })
+      const { data } = supabase.storage.from('products').getPublicUrl(filePath)
+      imageUrl = data.publicUrl
+    }
+    await product.update({ ...req.body, image: imageUrl })
+    res.json(product)
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+}
+
+const deleteProduct = async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id)
+    if (!product) return res.status(404).json({ message: 'Product not found' })
+    await product.destroy()
+    res.json({ message: 'Product deleted' })
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message })
+  }
+}
+
+module.exports = { createProduct, getProducts, updateProduct, deleteProduct, getSellerProducts }
