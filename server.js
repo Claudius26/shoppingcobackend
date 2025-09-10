@@ -9,7 +9,6 @@ dotenv.config();
 
 const app = express();
 
-// Ensure uploads folder exists
 const uploadsPath = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
@@ -24,6 +23,14 @@ connectDB();
 sequelize.sync()
   .then(() => console.log("All models synced"))
   .catch(err => console.log("Model sync error:", err));
+
+app.get('/', (req, res) => {
+  res.send('Backend is running');
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 app.use('/api/auth', require('./routes/authRoute'));
 app.use('/api/products', require('./routes/productRoutes'));
