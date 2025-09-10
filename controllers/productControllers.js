@@ -10,13 +10,13 @@ const createProduct = async (req, res) => {
     if (req.file) {
       const { originalname, buffer } = req.file
       const filePath = `products/${Date.now()}-${originalname}`
-      const { error } = await supabase.storage.from('products').upload(filePath, buffer, { contentType: req.file.mimetype })
+      const { error } = await supabase.storage.from('product-image').upload(filePath, buffer, { contentType: req.file.mimetype })
       if (error) return res.status(400).json({ message: 'Image upload failed', error })
-      const { data } = supabase.storage.from('products').getPublicUrl(filePath)
+      const { data } = supabase.storage.from('product-image').getPublicUrl(filePath)
       imageUrl = data.publicUrl
     }
 
-    const product = await Product.create({ ...req.body, image: imageUrl, userId: req.user.id })
+    const product = await Product.create({ ...req.body, imageUrl, sellerId: req.user.id })
     res.status(201).json(product)
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
@@ -34,7 +34,7 @@ const getProducts = async (req, res) => {
 
 const getSellerProducts = async (req, res) => {
   try {
-    const products = await Product.findAll({ where: { userId: req.user.id } })
+    const products = await Product.findAll({ where: { sellerId: req.user.id } })
     res.json(products)
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
@@ -46,18 +46,18 @@ const updateProduct = async (req, res) => {
     const product = await Product.findByPk(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
-    let imageUrl = req.body.imageUrl || product.image
+    let imageUrl = req.body.imageUrl || product.imageUrl
 
     if (req.file) {
       const { originalname, buffer } = req.file
       const filePath = `products/${Date.now()}-${originalname}`
-      const { error } = await supabase.storage.from('products').upload(filePath, buffer, { contentType: req.file.mimetype })
+      const { error } = await supabase.storage.from('product-image').upload(filePath, buffer, { contentType: req.file.mimetype })
       if (error) return res.status(400).json({ message: 'Image upload failed', error })
-      const { data } = supabase.storage.from('products').getPublicUrl(filePath)
+      const { data } = supabase.storage.from('product-image').getPublicUrl(filePath)
       imageUrl = data.publicUrl
     }
 
-    await product.update({ ...req.body, image: imageUrl })
+    await product.update({ ...req.body, imageUrl })
     res.json(product)
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message })
