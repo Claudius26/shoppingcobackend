@@ -5,12 +5,14 @@ const {
   getProducts,
   updateProduct,
   deleteProduct,
-  getSellerProducts
+  getSellerProducts,
+  getCategories
 } = require('../controllers/productControllers')
 const { protect } = require('../middlewares/authMiddleware')
 const multer = require('multer')
 const upload = multer({ storage: multer.memoryStorage() })
 
+router.get('/categories', getCategories)
 router.post('/seller', protect, upload.single('image'), createProduct)
 router.get('/seller', protect, getSellerProducts)
 router.put('/seller/:id', protect, upload.single('image'), updateProduct)
