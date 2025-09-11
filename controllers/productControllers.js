@@ -8,7 +8,7 @@ const supabase = createClient(
 
 const ALLOWED_CATEGORIES = Product.rawAttributes.category.values;
 
-// Get all allowed categories
+
 const getCategories = (req, res) => {
   try {
     res.json(ALLOWED_CATEGORIES);
@@ -18,7 +18,7 @@ const getCategories = (req, res) => {
   }
 };
 
-// Create a new product
+
 const createProduct = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
@@ -62,7 +62,7 @@ const createProduct = async (req, res) => {
   }
 };
 
-// Update an existing product
+
 const updateProduct = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
@@ -108,7 +108,7 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// Get all products
+
 const getProducts = async (req, res) => {
   try {
     const products = await Product.findAll();
@@ -119,7 +119,7 @@ const getProducts = async (req, res) => {
   }
 };
 
-// Get products for the logged-in seller
+
 const getSellerProducts = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
@@ -132,7 +132,7 @@ const getSellerProducts = async (req, res) => {
   }
 };
 
-// Delete a product
+
 const deleteProduct = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
@@ -147,6 +147,7 @@ const deleteProduct = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
+
 
 module.exports = {
   createProduct,
