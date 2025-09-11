@@ -8,7 +8,7 @@ exports.uploadProductImage = async (req, res) => {
     const fileName = `products/${Date.now()}-${file.originalname}`;
 
     const { data, error } = await supabase.storage
-      .from('product-images')
+      .from('product-image')
       .upload(fileName, file.buffer, {
         contentType: file.mimetype,
         upsert: true,
@@ -20,7 +20,7 @@ exports.uploadProductImage = async (req, res) => {
 
     
     const { data: publicUrlData } = supabase.storage
-      .from('product-images')
+      .from('product-image')
       .getPublicUrl(fileName);
 
     return res.json({ imageUrl: publicUrlData.publicUrl });
